@@ -5,12 +5,12 @@ import styles from './styles/MessageList.module.css';
 export default function MessageList({ messages, currentUserId }) {
   const bottomRef = useRef(null);
 
-  // Auto-scroll to latest message
+  // Tự động cuộn xuống khi có tin nhắn mới
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  if (messages.length === 0) {
+  if (!messages || messages.length === 0) {
     return (
       <div className={styles.empty}>
         <p>Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện! 👋</p>
@@ -21,22 +21,25 @@ export default function MessageList({ messages, currentUserId }) {
   return (
     <div className={styles.list}>
       {messages.map((msg, idx) => {
-        const isOwn = msg.sender._id === currentUserId;
-        const showAvatar =
-          !isOwn &&
-          (idx === 0 || messages[idx - 1].sender._id !== msg.sender._id);
+        // Kiểm tra xem msg.sender có phải object hay chỉ là ID (tùy vào populate của backend)
+        const senderId = typeof msg.sender === 'object' ? msg.sender._id : msg.sender;
+        const isOwn = senderId === currentUserId;
+        
+        // Hiển thị avatar nếu là tin nhắn đầu tiên của người khác hoặc người gửi thay đổi
+        const prevMsg = messages[idx - 1];
+        const prevSenderId = prevMsg ? (typeof prevMsg.sender === 'object' ? prevMsg.sender._id : prevMsg.sender) : null;
+        const showAvatar = !isOwn && (idx === 0 || prevSenderId !== senderId);
 
         return (
           <div
-            key={msg._id}
+            key={msg._id || idx}
             className={`${styles.row} ${isOwn ? styles.own : styles.other}`}
           >
-            {/* Avatar placeholder for alignment */}
             {!isOwn && (
               <div className={styles.avatarSlot}>
                 {showAvatar ? (
-                  <div className={styles.avatar}>
-                    {msg.sender.username.charAt(0).toUpperCase()}
+                  <div className={styles.avatar} title={msg.sender?.username}>
+                    {msg.sender?.username?.charAt(0).toUpperCase() || '?'}
                   </div>
                 ) : (
                   <div className={styles.avatarBlank} />
@@ -45,8 +48,7 @@ export default function MessageList({ messages, currentUserId }) {
             )}
 
             <div className={styles.bubble} title={formatFullTime(msg.createdAt)}>
-              {/* Show sender name in group chats for other people's messages */}
-              {!isOwn && showAvatar && (
+              {!isOwn && showAvatar && msg.sender?.username && (
                 <span className={styles.senderName}>{msg.sender.username}</span>
               )}
               <p className={styles.content}>{msg.content}</p>

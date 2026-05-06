@@ -75,4 +75,17 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+// GET /api/auth/me (dùng khi reload trang hoặc verify token)
+const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-passwordHash');
+    if (!user) {
+      return res.status(404).json({ message: 'Người dùng không tồn tại.' });
+    }
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server.', error: err.message });
+  }
+};
+
+module.exports = { register, login, getMe };
