@@ -7,29 +7,45 @@ import styles from './AuthPage.module.css';
 export default function RegisterPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: '', email: '', password: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  // Đổi tên state cho rõ nghĩa
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Tách name và value ra để dễ đọc, tránh viết gộp khó nhìn
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (form.password.length < 6) {
+
+    // Xử lý validate ngay từ đầu
+    if (formData.password.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự.');
       return;
     }
-    setLoading(true);
+
+    setIsLoading(true);
+
     try {
-      const res = await registerAPI(form);
-      login(res.data.user, res.data.token);
+      // Gọi API: Đã tối ưu destructuring lấy thẳng user và token
+      const { user, token } = await registerAPI(formData);
+
+      // Đăng ký thành công thì tự động đăng nhập luôn và chuyển hướng
+      login(user, token);
       navigate('/chat');
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng ký thất bại.');
+      setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -43,40 +59,46 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label>Tên người dùng</label>
+            <label htmlFor="username">Tên người dùng</label>
             <input
+              id="username"
               type="text"
               name="username"
-              value={form.username}
+              value={formData.username}
               onChange={handleChange}
               placeholder="nguyenvana"
               required
             />
           </div>
+
           <div className={styles.field}>
-            <label>Email</label>
+            <label htmlFor="email">Email</label>
             <input
+              id="email"
               type="email"
               name="email"
-              value={form.email}
+              value={formData.email}
               onChange={handleChange}
               placeholder="email@example.com"
               required
             />
           </div>
+
           <div className={styles.field}>
-            <label>Mật khẩu</label>
+            <label htmlFor="password">Mật khẩu</label>
             <input
+              id="password"
               type="password"
               name="password"
-              value={form.password}
+              value={formData.password}
               onChange={handleChange}
               placeholder="Tối thiểu 6 ký tự"
               required
             />
           </div>
-          <button type="submit" className={styles.btn} disabled={loading}>
-            {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
+
+          <button type="submit" className={styles.btn} disabled={isLoading}>
+            {isLoading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
           </button>
         </form>
 

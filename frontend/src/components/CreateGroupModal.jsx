@@ -4,74 +4,114 @@ import { createConversationAPI } from '../api/conversationAPI';
 import styles from './styles/CreateGroupModal.module.css';
 
 export default function CreateGroupModal({ onClose, onCreated }) {
+  // Đổi tên state cho chuẩn và dễ hiểu hơn
   const [groupName, setGroupName] = useState('');
-  const [query, setQuery] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSearch = async (e) => {
-    const value = e.target.value;
-    setQuery(value);
-    if (!value.trim()) { setSearchResults([]); return; }
-    setSearching(true);
-    try {
-      const res = await axiosInstance.get(`/users/search?q=${encodeURIComponent(value)}`);
-      // Filter out already selected members
-      setSearchResults(res.data.filter(
-        (u) => !selectedMembers.find((m) => m._id === u._id)
-      ));
-    } catch {
+  // Trạng thái Loading / Lỗi
+  const [isSearching, setIsSearching] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // 1. Xử lý khi người dùng gõ tìm kiếm thành viên
+  const handleSearchUser = async (e) => {
+    const keyword = e.target.value;
+    setSearchKeyword(keyword);
+
+    // Nếu xóa trắng ô tìm kiếm thì ẩn kết quả và dừng lại
+    if (!keyword.trim()) {
       setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // Lưu ý: Do gọi axiosInstance trực tiếp nên vẫn cần .data
+      const response = await axiosInstance.get(`/users/search?q=${encodeURIComponent(keyword)}`);
+      const foundUsers = response.data;
+
+      // Lọc bỏ những người đã được chọn vào nhóm (không hiển thị lại để tránh chọn trùng)
+      const unselectedUsers = foundUsers.filter((user) => {
+        const isAlreadySelected = selectedMembers.find((member) => member._id === user._id);
+        return !isAlreadySelected;
+      });
+
+      setSearchResults(unselectedUsers);
+    } catch (error) {
+      setSearchResults([]);
+      console.error('Lỗi khi tìm kiếm người dùng:', error);
     } finally {
-      setSearching(false);
+      setIsSearching(false);
     }
   };
 
-  const addMember = (user) => {
-    setSelectedMembers((prev) => [...prev, user]);
-    setSearchResults((prev) => prev.filter((u) => u._id !== user._id));
-    setQuery('');
+  // 2. Thêm người dùng vào danh sách nhóm
+  const handleAddMember = (userToAdd) => {
+    // Thêm vào mảng đã chọn
+    setSelectedMembers((prevMembers) => [...prevMembers, userToAdd]);
+
+    // Reset lại ô tìm kiếm cho sạch sẽ giao diện để gõ tìm người tiếp theo
+    setSearchKeyword('');
+    setSearchResults([]);
   };
 
-  const removeMember = (userId) => {
-    setSelectedMembers((prev) => prev.filter((u) => u._id !== userId));
+  // 3. Xóa người dùng khỏi danh sách đã chọn
+  const handleRemoveMember = (userIdToRemove) => {
+    setSelectedMembers((prevMembers) => prevMembers.filter((user) => user._id !== userIdToRemove));
   };
 
-  const handleCreate = async () => {
-    if (!groupName.trim()) { setError('Vui lòng nhập tên nhóm.'); return; }
-    if (selectedMembers.length < 1) { setError('Nhóm phải có ít nhất 1 thành viên khác.'); return; }
-    setError('');
-    setCreating(true);
+  // 4. Bấm nút Tạo Nhóm
+  const handleCreateGroup = async () => {
+    // Validate cơ bản
+    if (!groupName.trim()) {
+      setErrorMessage('Vui lòng nhập tên nhóm.');
+      return;
+    }
+    if (selectedMembers.length < 1) {
+      setErrorMessage('Nhóm phải có ít nhất 1 thành viên khác.');
+      return;
+    }
+
+    setErrorMessage('');
+    setIsCreating(true);
+
     try {
-      const res = await createConversationAPI({
+      // Gọi API: Đã bỏ .data vì createConversationAPI đã được tối ưu trả về sẵn data (ở các bước trước)
+      const newGroup = await createConversationAPI({
         type: 'group',
         name: groupName.trim(),
-        members: selectedMembers.map((m) => m._id),
+        // Backend chỉ cần mảng chứa các ID của thành viên
+        members: selectedMembers.map((member) => member._id),
       });
-      onCreated(res.data);
+
+      // Báo cho ChatPage biết là đã tạo xong (để đóng Modal và load lại danh sách)
+      onCreated(newGroup);
     } catch (err) {
-      setError(err.response?.data?.message || 'Tạo nhóm thất bại.');
+      setErrorMessage(err.response?.data?.message || 'Tạo nhóm thất bại. Vui lòng thử lại.');
     } finally {
-      setCreating(false);
+      setIsCreating(false);
     }
   };
 
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
+        {/* Tiêu đề Modal */}
         <div className={styles.modalHeader}>
           <h3>Tạo nhóm chat</h3>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose} title="Đóng">✕</button>
         </div>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {/* Báo lỗi nếu có */}
+        {errorMessage && <div className={styles.error}>{errorMessage}</div>}
 
+        {/* Nhập tên nhóm */}
         <div className={styles.field}>
-          <label>Tên nhóm</label>
+          <label htmlFor="groupName">Tên nhóm</label>
           <input
+            id="groupName"
             type="text"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
@@ -79,52 +119,57 @@ export default function CreateGroupModal({ onClose, onCreated }) {
           />
         </div>
 
+        {/* Tìm và thêm thành viên */}
         <div className={styles.field}>
-          <label>Thêm thành viên</label>
+          <label htmlFor="searchUser">Thêm thành viên</label>
           <input
+            id="searchUser"
             type="text"
-            value={query}
-            onChange={handleSearch}
+            value={searchKeyword}
+            onChange={handleSearchUser}
             placeholder="Tìm theo tên người dùng..."
           />
         </div>
 
-        {searching && <p className={styles.hint}>Đang tìm...</p>}
+        {isSearching && <p className={styles.hint}>Đang tìm...</p>}
 
+        {/* Danh sách kết quả tìm kiếm */}
         {searchResults.length > 0 && (
           <ul className={styles.searchList}>
-            {searchResults.map((u) => (
-              <li key={u._id} className={styles.searchItem} onClick={() => addMember(u)}>
-                <div className={styles.avatar}>{u.username.charAt(0).toUpperCase()}</div>
-                <span>{u.username}</span>
+            {searchResults.map((user) => (
+              <li key={user._id} className={styles.searchItem} onClick={() => handleAddMember(user)}>
+                <div className={styles.avatar}>{user.username.charAt(0).toUpperCase()}</div>
+                <span>{user.username}</span>
                 <span className={styles.addIcon}>＋</span>
               </li>
             ))}
           </ul>
         )}
 
+        {/* Danh sách những người ĐÃ ĐƯỢC CHỌN (Chips) */}
         {selectedMembers.length > 0 && (
           <div className={styles.selectedList}>
             <p className={styles.selectedLabel}>Đã chọn ({selectedMembers.length}):</p>
             <div className={styles.chips}>
-              {selectedMembers.map((m) => (
-                <span key={m._id} className={styles.chip}>
-                  {m.username}
-                  <button onClick={() => removeMember(m._id)}>✕</button>
+              {selectedMembers.map((member) => (
+                <span key={member._id} className={styles.chip}>
+                  {member.username}
+                  <button onClick={() => handleRemoveMember(member._id)}>✕</button>
                 </span>
               ))}
             </div>
           </div>
         )}
 
+        {/* Nút hành động */}
         <div className={styles.footer}>
           <button className={styles.cancelBtn} onClick={onClose}>Hủy</button>
           <button
             className={styles.createBtn}
-            onClick={handleCreate}
-            disabled={creating}
+            onClick={handleCreateGroup}
+            disabled={isCreating}
           >
-            {creating ? 'Đang tạo...' : 'Tạo nhóm'}
+            {isCreating ? 'Đang tạo...' : 'Tạo nhóm'}
           </button>
         </div>
       </div>
