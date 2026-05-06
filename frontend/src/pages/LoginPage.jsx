@@ -7,25 +7,32 @@ import styles from './AuthPage.module.css';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Tách biến name, value ra cho dễ nhìn thay vì viết gộp
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setIsLoading(true);
+
     try {
-      const res = await loginAPI(form);
-      login(res.data.user, res.data.token);
+      // Bóc tách thẳng user và token vì authAPI.js đã trả về response.data
+      const { user, token } = await loginAPI(formData);
+
+      login(user, token);
       navigate('/chat');
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng nhập thất bại.');
+      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -39,29 +46,33 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label>Email</label>
+            <label htmlFor="email">Email</label>
             <input
+              id="email"
               type="email"
               name="email"
-              value={form.email}
+              value={formData.email}
               onChange={handleChange}
               placeholder="email@example.com"
               required
             />
           </div>
+
           <div className={styles.field}>
-            <label>Mật khẩu</label>
+            <label htmlFor="password">Mật khẩu</label>
             <input
+              id="password"
               type="password"
               name="password"
-              value={form.password}
+              value={formData.password}
               onChange={handleChange}
               placeholder="••••••••"
               required
             />
           </div>
-          <button type="submit" className={styles.btn} disabled={loading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+
+          <button type="submit" className={styles.btn} disabled={isLoading}>
+            {isLoading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
 

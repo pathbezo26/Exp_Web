@@ -1,7 +1,14 @@
 import axiosInstance from './axiosInstance';
 
-export const getMessagesAPI = (conversationId) =>
-  axiosInstance.get(`/messages/${conversationId}`);
+// Lấy lịch sử tin nhắn của một conversation
+export const getMessagesAPI = async (conversationId) => {
+  const response = await axiosInstance.get(`/messages/${conversationId}`);
+  return response.data;
+};
 
-export const saveMessageAPI = (data) =>
-  axiosInstance.post('/messages', data);
+// Gửi tin nhắn mới (lưu vào DB qua REST — song song với việc emit qua socket)
+// data: { conversationId, content }
+export const sendMessageAPI = async (data) => {
+  const response = await axiosInstance.post('/messages', data);
+  return response.data;
+};
