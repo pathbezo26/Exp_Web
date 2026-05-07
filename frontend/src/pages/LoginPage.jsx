@@ -24,10 +24,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Bóc tách thẳng user và token vì authAPI.js đã trả về response.data
-      const { user, token } = await loginAPI(formData);
+      // Đẩy toàn bộ trách nhiệm gọi API và lưu state cho Context
+      await login(formData);
 
-      login(user, token);
+      // Thành công thì chuyển trang
       navigate('/chat');
     } catch (err) {
       setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');

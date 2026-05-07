@@ -33,12 +33,12 @@ export function AuthProvider({ children }) {
     verifyUser();
   }, [token]);
 
-  // Hàm này được gọi từ LoginPage sau khi gọi API login thành công
-  const login = (userData, jwtToken) => {
-    setUser(userData);
-    setToken(jwtToken);
-    localStorage.setItem('token', jwtToken);
-    // Không cần lưu user vào localStorage nữa vì ta sẽ dùng getMeAPI khi reload
+  const login = async (data) => {
+    const data = await loginAPI(data);
+    localStorage.setItem('token', data.token);
+    setUser(data.user);
+    setToken(data.token);
+    return data;
   };
 
   const logout = () => {
