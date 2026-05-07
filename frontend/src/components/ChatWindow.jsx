@@ -18,18 +18,24 @@ export default function ChatWindow({ conversation }) {
   useEffect(() => {
     // Nếu chưa chọn ai để chat thì dừng lại
     if (!conversation) return;
-
+    // TẠO CỜ ĐÁNH DẤU: Mặc định là chưa hủy
+    let ignore = false;
     // Định nghĩa hàm tải dữ liệu ngay trong useEffect cho dễ quản lý
     const fetchMessages = async () => {
       setIsLoading(true);
       try {
         // Gọi API: (Lưu ý đã bỏ .data vì messageAPI đã xử lý)
         const data = await getMessagesAPI(conversation._id);
-        setMessages(data);
+        // KIỂM TRA TRƯỚC KHI CẬP NHẬT: 
+        // Nếu người dùng chưa chuyển sang phòng khác thì mới set State
+        if (!ignore) {
+          setMessages(data);
+        }
       } catch (error) {
         console.error('Lỗi khi tải tin nhắn:', error);
       } finally {
-        setIsLoading(false);
+        // Tương tự, nếu chưa chuyển phòng thì mới tắt Loading
+        if (!ignore) setIsLoading(false);
       }
     };
 

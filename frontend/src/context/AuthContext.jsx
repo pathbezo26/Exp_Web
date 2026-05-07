@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect } from 'react';
 import { getMeAPI } from '../api/authAPI';
+import SplashScreen from '../components/SplashScreen';
 
 export const AuthContext = createContext(null);
 
@@ -48,7 +49,7 @@ export function AuthProvider({ children }) {
 
   // Tránh việc chớp màn hình UI khi đang gọi API verify token
   if (isLoading) {
-    return <div>Đang tải dữ liệu...</div>; // Bạn có thể thay bằng component Spinner
+    return <SplashScreen />; // Bạn có thể thay bằng component Spinner
   }
 
   return (

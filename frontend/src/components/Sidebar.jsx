@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { getConversationsAPI } from '../api/conversationAPI';
 import useAuth from '../hooks/useAuth';
 import useSocket from '../hooks/useSocket';
@@ -10,133 +10,171 @@ import styles from './styles/Sidebar.module.css';
 export default function Sidebar({ activeConversation, onSelectConversation }) {
   const { user, logout } = useAuth();
   const socket = useSocket();
+
   const [conversations, setConversations] = useState([]);
+
+  // Trạng thái bật/tắt các khung tìm kiếm và tạo nhóm
   const [showSearch, setShowSearch] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
 
-  // Hàm tải danh sách hội thoại
-  const loadConversations = useCallback(async () => {
+  // 1. Hàm tải danh sách các cuộc trò chuyện từ Server
+  const loadConversations = async () => {
     try {
-      const res = await getConversationsAPI();
-      setConversations(res.data);
-    } catch (err) {
-      console.error('Failed to load conversations', err);
+      // Đã tối ưu destructuring dựa trên cấu trúc authAPI trả về thẳng data
+      const data = await getConversationsAPI();
+      setConversations(data);
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách cuộc trò chuyện:', error);
     }
-  }, []);
+  };
 
+  // Chạy 1 lần duy nhất khi vừa mở Sidebar lên
   useEffect(() => {
     loadConversations();
-  }, [loadConversations]);
+  }, []);
 
-  // Lắng nghe sự kiện socket để cập nhật Sidebar theo thời gian thực
+  // 2. Lắng nghe tin nhắn mới từ Socket để sắp xếp lại danh sách Sidebar
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewMessage = (msg) => {
-      setConversations((prev) => {
-        // Tìm hội thoại chứa tin nhắn này
-        const index = prev.findIndex((c) => c._id === msg.conversationId);
-        if (index === -1) {
-          // Nếu hội thoại chưa có trong list (ví dụ tin nhắn từ người mới), tải lại toàn bộ
-          loadConversations();
-          return prev;
-        }
-        // Đưa hội thoại vừa có tin nhắn lên đầu và cập nhật updatedAt
-        const updated = [...prev];
-        const conv = { ...updated[index], updatedAt: msg.createdAt };
-        updated.splice(index, 1);
-        return [conv, ...updated];
-      });
+    // Khi có người nhắn tin đến (ở bất kỳ phòng nào), ta gọi lại API 
+    // để cập nhật lại tin nhắn mới nhất và đẩy phòng đó lên đầu.
+    const handleNewMessage = () => {
+      loadConversations();
     };
 
     socket.on('newMessage', handleNewMessage);
-    return () => socket.off('newMessage', handleNewMessage);
-  }, [socket, loadConversations]);
 
-  const getConversationName = (conv) => {
-    if (conv.type === 'group') return conv.name || 'Nhóm không tên';
-    const otherMember = conv.members.find((m) => m._id !== user?._id);
+    // Dọn dẹp listener khi component bị đóng
+    return () => socket.off('newMessage', handleNewMessage);
+  }, [socket]);
+
+  // --- CÁC HÀM PHỤ TRỢ (HELPERS) ĐỂ RENDER UI ---
+
+  // Lấy tên hiển thị cho cuộc trò chuyện
+  const getConversationName = (conversation) => {
+    // Nếu là nhóm chat
+    if (conversation.type === 'group') {
+      return conversation.name || 'Nhóm không tên';
+    }
+
+    // Nếu là chat cá nhân 1-1: Tìm người không phải là mình
+    const otherMember = conversation.members.find((member) => member._id !== user._id);
     return otherMember?.username || 'Người dùng';
   };
 
-  const getAvatarLetter = (conv) => {
-    if (conv.type === 'group') return '👥';
-    return getConversationName(conv).charAt(0).toUpperCase();
+  // Lấy ký tự Avatar (Ví dụ: "Nam" -> "N")
+  const getAvatar = (conversation) => {
+    if (conversation.type === 'group') return '👥';
+
+    const displayName = getConversationName(conversation);
+    return displayName.charAt(0).toUpperCase();
+  };
+
+  // --- XỬ LÝ SỰ KIỆN NÚT BẤM ---
+
+  const toggleSearchPanel = () => {
+    setShowSearch(!showSearch);
+    setShowGroupModal(false); // Bật tìm kiếm thì phải tắt tạo nhóm đi
+  };
+
+  const toggleGroupModal = () => {
+    setShowGroupModal(!showGroupModal);
+    setShowSearch(false); // Bật tạo nhóm thì phải tắt tìm kiếm đi
   };
 
   return (
     <aside className={styles.sidebar}>
-      {/* User Header */}
+      {/* --- PHẦN HEADER (Avatar và tên của MÌNH) --- */}
       <div className={styles.header}>
         <div className={styles.userInfo}>
-          <div className={styles.avatar}>{user?.username?.charAt(0).toUpperCase()}</div>
-          <span className={styles.username}>{user?.username}</span>
+          <div className={styles.avatar}>
+            {user.username.charAt(0).toUpperCase()}
+          </div>
+          <span className={styles.username}>{user.username}</span>
         </div>
-        <button className={styles.logoutBtn} onClick={logout} title="Đăng xuất">⎋</button>
+
+        <button className={styles.logoutBtn} onClick={logout} title="Đăng xuất">
+          ⎋
+        </button>
       </div>
 
-      {/* Action Tabs */}
+      {/* --- PHẦN NÚT HÀNH ĐỘNG --- */}
       <div className={styles.actions}>
-        <button 
-          className={`${styles.actionBtn} ${showSearch ? styles.btnActive : ''}`}
-          onClick={() => { setShowSearch(!showSearch); setShowGroupModal(false); }}
-        >
-          🔍 Tìm kiếm
+        <button className={styles.actionBtn} onClick={toggleSearchPanel}>
+          🔍 Tìm người dùng
         </button>
-        <button 
-          className={`${styles.actionBtn} ${showGroupModal ? styles.btnActive : ''}`}
-          onClick={() => { setShowGroupModal(!showGroupModal); setShowSearch(false); }}
-        >
+        <button className={styles.actionBtn} onClick={toggleGroupModal}>
           ➕ Tạo nhóm
         </button>
       </div>
 
-      {/* Toggles: Search & Group Modal */}
+      {/* --- CÁC KHUNG CHỨC NĂNG (Bật/Tắt) --- */}
       {showSearch && (
-        <UserSearch 
-          onConversationCreated={(conv) => {
-            setConversations(prev => {
-              const exists = prev.find(c => c._id === conv._id);
-              return exists ? prev : [conv, ...prev];
+        <UserSearch
+          onConversationCreated={(newConversation) => {
+            setConversations((prev) => {
+              // Tránh thêm trùng nếu cuộc trò chuyện này đã có sẵn ở Sidebar
+              const isExist = prev.find((conv) => conv._id === newConversation._id);
+              if (isExist) return prev;
+
+              // Thêm phòng mới lên trên cùng
+              return [newConversation, ...prev];
             });
-            onSelectConversation(conv);
-            setShowSearch(false);
-          }} 
+
+            // Tự động chọn phòng này để nhảy sang khung chat
+            onSelectConversation(newConversation);
+            setShowSearch(false); // Ẩn khung tìm kiếm đi
+          }}
         />
       )}
 
       {showGroupModal && (
-        <CreateGroupModal 
+        <CreateGroupModal
           onClose={() => setShowGroupModal(false)}
-          onCreated={(conv) => {
-            setConversations(prev => [conv, ...prev]);
-            onSelectConversation(conv);
+          onCreated={(newGroup) => {
+            // Thêm nhóm mới vào danh sách và đẩy lên đầu
+            setConversations((prev) => [newGroup, ...prev]);
+
+            // Nhảy vào chat nhóm đó luôn
+            onSelectConversation(newGroup);
             setShowGroupModal(false);
           }}
         />
       )}
 
-      {/* Conversation List */}
+      {/* --- DANH SÁCH CUỘC TRÒ CHUYỆN --- */}
       <div className={styles.list}>
-        {conversations.length === 0 ? (
-          <p className={styles.empty}>Chưa có cuộc hội thoại nào</p>
-        ) : (
-          conversations.map((conv) => (
+        {conversations.length === 0 && (
+          <p className={styles.empty}>Chưa có cuộc trò chuyện nào.</p>
+        )}
+
+        {conversations.map((conv) => {
+          // Kiểm tra xem đây có phải là phòng chat đang được chọn (đang mở) không
+          const isCurrentlyActive = activeConversation?._id === conv._id;
+
+          return (
             <div
               key={conv._id}
-              className={`${styles.item} ${activeConversation?._id === conv._id ? styles.active : ''}`}
+              className={`${styles.item} ${isCurrentlyActive ? styles.active : ''}`}
               onClick={() => onSelectConversation(conv)}
             >
-              <div className={styles.convAvatar}>{getAvatarLetter(conv)}</div>
+              <div className={styles.convAvatar}>
+                {getAvatar(conv)}
+              </div>
+
               <div className={styles.convInfo}>
-                <span className={styles.convName}>{getConversationName(conv)}</span>
+                <span className={styles.convName}>
+                  {getConversationName(conv)}
+                </span>
+
                 <span className={styles.convTime}>
                   {conv.updatedAt ? formatMessageTime(conv.updatedAt) : ''}
                 </span>
               </div>
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
     </aside>
   );

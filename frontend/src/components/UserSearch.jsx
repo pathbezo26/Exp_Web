@@ -43,7 +43,7 @@ export default function UserSearch({ onConversationCreated }) {
         members: [targetUser._id],
       });
       // res.data thường chứa object conversation mới hoặc cũ nếu đã tồn tại
-      onConversationCreated(res.data);
+      onConversationCreated(res);
     } catch (err) {
       alert(err.response?.data?.message || 'Không thể tạo cuộc trò chuyện');
     } finally {

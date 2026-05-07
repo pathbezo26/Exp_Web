@@ -66,7 +66,7 @@ export default function LoginPage() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="••••••••"
+              placeholder="Nhập mật khẩu"
               required
             />
           </div>
